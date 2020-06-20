@@ -13,7 +13,9 @@ namespace test_array_list {
     // return 0 for success and 1 for failure
     int test_construct();
     int test_size();
-    int test_resize();
+    int test_insert();
+    int test_iterator();
+    int test_remove();
 
     // returns number of failures for all tests
     extern const int NUM_TESTS;

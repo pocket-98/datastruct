@@ -6,7 +6,6 @@
 FLAGS           ?= -g
 
 BIN             = bin/
-MAIN            =
 SOURCES         = $(shell find src/ -type f -name "*.cpp" | grep -v "main.cpp")
 HEADERS         = $(shell find src/ -type f -name "*.hpp") \
                  $(shell find src/ -type f -name "*.tpp")
@@ -17,57 +16,32 @@ TEST_SOURCES    = $(shell find test/ -type f -name "*.cpp" | grep -v "main.cpp")
 TEST_HEADERS    = $(shell find test/ -type f -name "*.hpp")
 TARGET_TEST     = a.out-test
 
-GCCOPTS         = -Wall -Wextra -pedantic -std=c99 -I src/
 GXXOPTS         = -Wall -Wextra -pedantic -std=c++11 -I src/
 LDLIBS          =
-CCOPTS          = $(GCCOPTS) $(CCFLAGS) $(FLAGS)
 CXXOPTS         = $(GXXOPTS) $(CXXFLAGS) $(FLAGS)
 MKDIR           = mkdir -p
-PYTHON          = python3
 
-MAIN_OBJ        = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(MAIN))) \
-                $(patsubst %.c,$(BIN)%.o, $(filter %.c,$(MAIN)))
-OBJ             = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(SOURCES))) \
-                $(patsubst %.c,$(BIN)%.o, $(filter %.c,$(SOURCES)))
+OBJ             = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(SOURCES)))
 
-TEST_MAIN_OBJ   = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(TEST_MAIN))) \
-                $(patsubst %.c,$(BIN)%.o, $(filter %.c,$(TEST_MAIN)))
-TEST_OBJ        = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(TEST_SOURCES))) \
-                $(patsubst %.c,$(BIN)%.o, $(filter %.c,$(TEST_SOURCES)))
+TEST_MAIN_OBJ   = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(TEST_MAIN)))
+TEST_OBJ        = $(patsubst %.cpp,$(BIN)%.o, $(filter %.cpp,$(TEST_SOURCES)))
 
 TARGET_COV      = a.out-cov
-GCOV            = gcov
-COVOPTS         = -fprofile-arcs -ftest-coverage --coverage -fno-inline -O0 -fno-inline-small-functions -fno-default-inline
-GCOVOPTS        = -b -n
-GCOVPRNT        = grep -EA 4 "\.c|\.cpp" | grep -v "/usr/include" \
-                | sed -E '/^No.*/d' | sed -E 's/(^Lin|^Bra|^Tak|^Cal)/    \1/'
+COVOPTS         = -fprofile-arcs -ftest-coverage --coverage -fno-inline \
+                  -O0 -fno-inline-small-functions -fno-default-inline
+GCOV            = gcov -rpbj
 
-COV_GCDA        = $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(MAIN))) \
-                $(patsubst %.c,$(BIN)%.gcda,$(filter %.c,$(MAIN))) \
-                $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(SOURCES))) \
-                $(patsubst %.c,$(BIN)%.gcda,$(filter %.c,$(SOURCES))) \
+COV_GCDA        = $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(SOURCES))) \
                 $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(TEST_MAIN))) \
-                $(patsubst %.c,$(BIN)%.gcda,$(filter %.c,$(TEST_MAIN))) \
-                $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(TEST_SOURCES))) \
-                $(patsubst %.c,$(BIN)%.gcda,$(filter %.c,$(TEST_SOURCES)))
+                $(patsubst %.cpp,$(BIN)%.gcda,$(filter %.cpp,$(TEST_SOURCES)))
 
-COV_GCNO        = $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(MAIN))) \
-                $(patsubst %.c,$(BIN)%.gcno,$(filter %.c,$(MAIN))) \
-                $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(SOURCES))) \
-                $(patsubst %.c,$(BIN)%.gcno,$(filter %.c,$(SOURCES))) \
+COV_GCNO        = $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(SOURCES))) \
                 $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(TEST_MAIN))) \
-                $(patsubst %.c,$(BIN)%.gcno,$(filter %.c,$(TEST_MAIN))) \
-                $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(TEST_SOURCES))) \
-                $(patsubst %.c,$(BIN)%.gcno,$(filter %.c,$(TEST_SOURCES)))
+                $(patsubst %.cpp,$(BIN)%.gcno,$(filter %.cpp,$(TEST_SOURCES)))
 
-.PHONY: all test cov
+.PHONY: all test cov covr vars
 
 all: $(TARGET)
-
-# compile .c source files to objects (.o)
-$(BIN)%.o: %.c $(HEADERS) $(TEST_HEADERS)
-	@$(MKDIR) $(@D)
-	$(CC) $(CCOPTS) -o $@ -c $<
 
 # compile .cpp source files to objects (.o)
 $(BIN)%.o: %.cpp $(HEADERS) $(TEST_HEADERS)
@@ -75,7 +49,7 @@ $(BIN)%.o: %.cpp $(HEADERS) $(TEST_HEADERS)
 	$(CXX) -fPIC -shared $(CXXOPTS) -o $@ -c $<
 
 # link executable
-$(TARGET): $(OBJ) $(MAIN_OBJ)
+$(TARGET): $(OBJ)
 	$(CXX) -fPIC -shared $(CXXOPTS) -o $@ $^ $(LDLIBS)
 	@echo "binary compiled: '$(TARGET)'"
 
@@ -89,11 +63,6 @@ test: $(TARGET) $(TARGET_TEST)
 	@echo "unit testing:"
 	./$(TARGET_TEST)
 
-# compile .c source files to objects (.o) with line coverage on
-$(BIN)%.gcda: %.c
-	@$(MKDIR) $(@D)
-	$(CC) $(CCOPTS) $(COVOPTS) -o $(patsubst %.gcda,%.o,$@) -c $<
-
 # compile .cpp source files to objects (.o) with line coverage on
 $(BIN)%.gcda: %.cpp
 	@$(MKDIR) $(@D)
@@ -101,8 +70,6 @@ $(BIN)%.gcda: %.cpp
 
 # link executable with line coverage on
 $(TARGET_COV): $(COV_GCDA) $(COV_GCNO)
-	$(CXX) -fPIC -shared $(CXXOPTS) $(COVOPTS) -o $(TARGET) $(OBJ) $(MAIN_OBJ) $(LDLIBS)
-	@echo "binary compiled: '$(TARGET)'"
 	$(CXX) $(CXXOPTS) $(COVOPTS) -o $@ $(OBJ) $(TEST_OBJ) $(TEST_MAIN_OBJ) $(LDLIBS)
 	@echo "binary compiled: '$(TARGET_COV)'"
 
@@ -111,22 +78,29 @@ cov: $(TARGET_COV)
 	@echo "testing:"
 	./$(TARGET_COV)
 	@echo -e "\nchecking coverage '$(TARGET_COV)':"
-	@$(GCOV) $(GCOVOPTS) $(COV_GCDA) | $(GCOVPRNT)
+	@$(GCOV) -n $(COV_GCDA) | awk '/^File/ {f=0} /^File.+\.cpp|^File.+\.tpp/ \
+	{f=1; t="\n"} (f==1) {if (!($$0 ~ /^No /)) {print t $$0} t="    "} '
+
+# make coverage files for each source
+covr: cov
+	@$(GCOV) $(COV_GCDA) | grep -E "^Creating" | cut -d"'" -f2 \
+	| awk -F"#" 'BEGIN{print "set -x"} {o="$(BIN)" $$0; gsub("#","/",o); d=o; \
+	gsub($$NF,"",d); printf("mkdir -p %s; mv %s %s\n", d, $$0, o)}' | bash
 
 # remove objects and executable
 clean:
-	$(RM) $(TARGET) $(MAIN_OBJ) $(OBJ)
+	$(RM) $(TARGET) $(OBJ)
 	$(RM) $(TARGET_TEST) $(TEST_MAIN_OBJ) $(TEST_OBJ)
 	$(RM) $(TARGET_COV) $(COV_GCDA) $(COV_GCNO)
-	$(RM) -r $(PY_CACHE)
 
 # print variables
 vars:
+	@echo "CXX                      $(CXX)"
+	@echo "CXXOPTS                  $(CXXOPTS)"
+	@echo
 	@echo "TARGET                   $(TARGET)"
-	@echo "MAIN                     $(MAIN)"
 	@echo "SOURCES                  $(SOURCES)"
 	@echo "HEADERS                  $(HEADERS)"
-	@echo "MAIN_OBJ                 $(MAIN_OBJ)"
 	@echo "OBJ                      $(OBJ)"
 	@echo
 	@echo "TARGET_TEST              $(TARGET_TEST)"
@@ -135,4 +109,7 @@ vars:
 	@echo "TEST_HEADERS             $(TEST_HEADERS)"
 	@echo
 	@echo "TARGET_COV               $(TARGET_COV)"
+	@echo "COVOPTS                  $(COVOPTS)"
+	@echo "GCOV                     $(GCOV)"
+	@echo "COV_GCDA                 $(COV_GCDA)"
 	@echo

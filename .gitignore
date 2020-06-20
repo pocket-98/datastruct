@@ -1,3 +1,14 @@
+# gcov
+*.gcda
+*.gcno
+*.gcov
+
+bin/*
+
+libpvn.so
+a.out-test
+a.out-cov
+
 # Prerequisites
 *.d
 

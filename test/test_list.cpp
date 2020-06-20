@@ -14,3 +14,4 @@ int test_list::run_all() {
     fails += test_array_list::run_all();
     return fails;
 }
+
